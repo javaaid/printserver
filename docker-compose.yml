@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  print-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - LOG_LEVEL=debug
+    volumes:
+      - ./config:/usr/src/app/config:ro
+      - ./logs:/usr/src/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Test web server to simulate CORS requests from different origins
+  cors-test-web:
+    image: nginx:alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./test-web:/usr/share/nginx/html:ro
+    depends_on:
+      - print-server
+    restart: unless-stopped
+
+  # Another test server on different port for cross-origin testing
+  cors-test-web-alt:
+    image: nginx:alpine
+    ports:
+      - "8081:80"
+    volumes:
+      - ./test-web:/usr/share/nginx/html:ro
+    depends_on:
+      - print-server
+    restart: unless-stopped
+
+networks:
+  default:
+    driver: bridge
